@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Move-In Inspection Checklist</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background: #F7F8FA; }
+  ::-webkit-scrollbar { display: none; }
+  input, textarea, button { font-family: inherit; }
+  textarea { resize: none; }
+  @keyframes fadeSlide { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:translateY(0);} }
+  .item-card { animation: fadeSlide 0.18s ease; }
+  input:focus, textarea:focus { border-color: #2B7AA5 !important; box-shadow: 0 0 0 3px rgba(43,122,165,0.12); outline: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState, useRef } = React;
+
+const DEFAULT_ROOMS = [
+  {
+    name: "Entryway / Living Room", emoji: "🛋️",
+    items: [
+      "Front Door & Lock", "Deadbolt", "Doorbell", "Entryway Flooring", "Entryway Walls & Paint",
+      "Living Room Flooring", "Living Room Walls & Paint", "Ceiling", "Windows & Blinds",
+      "Outlets & Switches", "Thermostat",
+      "A/C – Cooling (test)", "Heating (test)", "Air Vents / Registers"
+    ]
+  },
+  {
+    name: "Kitchen", emoji: "🍳",
+    items: [
+      "Stove / Oven (burners, oven door, broiler)", "Microwave", "Dishwasher",
+      "Refrigerator / Freezer", "Sink & Faucet", "Garbage Disposal",
+      "Cabinets & Hardware", "Countertops", "Overhead Light",
+      "Flooring", "Walls & Paint", "Outlets & Switches", "Air Vent / Register"
+    ]
+  },
+  {
+    name: "Dining Room", emoji: "🍽️",
+    items: [
+      "Overhead Lamp / Light Fixture", "Flooring", "Walls & Paint", "Ceiling",
+      "Windows & Blinds", "Outlets & Switches", "Air Vent / Register"
+    ]
+  },
+  {
+    name: "Master Bedroom", emoji: "🛏️",
+    items: [
+      "Recessed Lights (all functional)", "Flooring", "Walls & Paint", "Ceiling",
+      "Windows & Blinds", "Closet – Doors & Rod", "Outlets & Switches",
+      "Door & Lock", "Air Vent / Register"
+    ]
+  },
+  {
+    name: "Atrium", emoji: "🌿",
+    items: [
+      "Sliding Door – Operation & Lock", "Sliding Door – Glass & Frame", "Sliding Door – Screen",
+      "Flooring / Pavers", "Walls & Fencing", "Outdoor Lighting", "Outlets (outdoor)"
+    ]
+  },
+  {
+    name: "Master Bathroom", emoji: "🛁",
+    items: [
+      "Toilet (flush, seat, base, no leaks)", "Sink & Faucet", "Cabinets & Hardware",
+      "Walk-In Shower – Walls & Tile", "Walk-In Shower – Glass",
+      "Walk-In Shower – Drain & Water Pressure", "Caulking & Grout",
+      "Flooring", "Walls & Paint", "Mirror", "Exhaust Fan",
+      "Outlets & Switches", "Towel Bars & Hooks"
+    ]
+  },
+  {
+    name: "Second Bedroom", emoji: "🛏️",
+    items: [
+      "Flooring", "Walls & Paint", "Ceiling", "Windows & Blinds",
+      "Closet – Doors & Rod", "Outlets & Switches", "Door"
+    ]
+  },
+  {
+    name: "Second Bathroom", emoji: "🚿",
+    items: [
+      "Toilet (flush, seat, base, no leaks)", "Sink & Faucet", "Cabinets & Hardware",
+      "Flooring", "Walls & Paint", "Mirror", "Exhaust Fan",
+      "Outlets & Switches", "Towel Bars & Hooks"
+    ]
+  },
+  {
+    name: "Backyard", emoji: "🌳",
+    items: [
+      "Back Door & Lock", "Patio / Deck Condition", "Yard / Landscaping",
+      "Fencing & Gates", "Exterior Walls", "Outdoor Outlets / Lighting", "Drainage"
+    ]
+  },
+  {
+    name: "Garage", emoji: "🚗",
+    items: [
+      "Garage Door (open / close / auto-reverse)", "Garage Door Opener & Remote",
+      "Washer (run cycle)", "Dryer (run cycle, vent)", "Storage Cabinets & Hardware",
+      "Flooring", "Walls", "Outlets & Switches", "Lighting",
+      "Door to House – Lock & Seal"
+    ]
+  },
+];
+
+const COND = {
+  Good: { bg: "#E8F5EE", text: "#1B6B3A", border: "#A8D5B8", dot: "#2E9957", label: "✓ Good" },
+  Fair: { bg: "#FFF8EC", text: "#8A5200", border: "#FACA7A", dot: "#E0960A", label: "~ Fair" },
+  Poor: { bg: "#FEF0F0", text: "#8B1A1A", border: "#F5AAAA", dot: "#D93030", label: "✕ Poor" },
+};
+
+function App() {
+  const [screen, setScreen] = useState("home");
+  const [property, setProperty] = useState({ address: "", tenant: "", tenant2: "", landlord: "", date: new Date().toISOString().split("T")[0], moveIn: "" });
+  const [rooms] = useState(DEFAULT_ROOMS);
+  const [conditions, setConditions] = useState({});
+  const [notes, setNotes] = useState({});
+  const [media, setMedia] = useState({});
+  const [lightbox, setLightbox] = useState(null);
+  const [activeRoom, setActiveRoom] = useState(0);
+
+  const photoRef = useRef(null);
+  const videoRef = useRef(null);
+  const uploadTargetRef = useRef(null);
+  const tabsRef = useRef(null);
+
+  const k = (ri, ii) => `${ri}-${ii}`;
+  const totalItems = rooms.reduce((a, r) => a + r.items.length, 0);
+  const doneItems = Object.values(conditions).filter(Boolean).length;
+  const issueCount = Object.values(conditions).filter(c => c === "Poor").length;
+  const pct = totalItems ? Math.round((doneItems / totalItems) * 100) : 0;
+
+  function setCondition(ri, ii, cond) {
+    setConditions(prev => ({ ...prev, [k(ri, ii)]: prev[k(ri, ii)] === cond ? null : cond }));
+  }
+
+  function addMediaItem(ri, ii, type, src) {
+    setMedia(prev => ({ ...prev, [k(ri, ii)]: [...(prev[k(ri, ii)] || []), { type, src }] }));
+  }
+
+  function deleteMediaItem(ri, ii, mi) {
+    setMedia(prev => ({ ...prev, [k(ri, ii)]: prev[k(ri, ii)].filter((_, i) => i !== mi) }));
+  }
+
+  function triggerPhoto(ri, ii) {
+    uploadTargetRef.current = { ri, ii };
+    photoRef.current.click();
+  }
+
+  function triggerVideo(ri, ii) {
+    uploadTargetRef.current = { ri, ii };
+    videoRef.current.click();
+  }
+
+  function handlePhoto(e) {
+    Array.from(e.target.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => addMediaItem(uploadTargetRef.current.ri, uploadTargetRef.current.ii, "photo", ev.target.result);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  function handleVideo(e) {
+    Array.from(e.target.files).forEach(file => {
+      const url = URL.createObjectURL(file);
+      addMediaItem(uploadTargetRef.current.ri, uploadTargetRef.current.ii, "video", url);
+    });
+    e.target.value = "";
+  }
+
+  function getRoomDone(ri) {
+    return rooms[ri].items.filter((_, ii) => conditions[k(ri, ii)]).length;
+  }
+
+  function switchRoom(ri) {
+    setActiveRoom(ri);
+    setTimeout(() => {
+      const tabs = tabsRef.current;
+      if (!tabs) return;
+      const btn = tabs.children[ri];
+      if (btn) btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }, 50);
+  }
+
+  const inputStyle = { width: "100%", border: "1.5px solid #E5E7EB", borderRadius: 10, padding: "11px 13px", fontSize: 14, color: "#111827", background: "#FAFAFA", outline: "none" };
+
+  // LIGHTBOX
+  if (lightbox) {
+    const m = media[lightbox.key] && media[lightbox.key][lightbox.mi];
+    return (
+      <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button onClick={() => setLightbox(null)} style={{ position: "fixed", top: 20, right: 20, background: "rgba(255,255,255,0.15)", color: "white", border: "none", borderRadius: "50%", width: 44, height: 44, fontSize: 20, cursor: "pointer" }}>✕</button>
+        {m && m.type === "photo"
+          ? <img src={m.src} style={{ maxWidth: "95vw", maxHeight: "88vh", borderRadius: 10 }} />
+          : <video src={m && m.src} controls autoPlay playsInline style={{ maxWidth: "95vw", maxHeight: "88vh", borderRadius: 10 }} onClick={e => e.stopPropagation()} />
+        }
+      </div>
+    );
+  }
+
+  // HOME
+  if (screen === "home") return (
+    <div style={{ background: "#F7F8FA", minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ background: "linear-gradient(160deg, #0D1B2A 0%, #1B3A52 100%)", padding: "52px 24px 48px", color: "white" }}>
+        <div style={{ fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "#7EC8E3", fontWeight: 700, marginBottom: 14 }}>Move-In Inspection</div>
+        <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1.1, marginBottom: 10, letterSpacing: -0.5 }}>Property<br />Checklist</div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>Document every room with photos and videos.</div>
+        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+          {[{ n: rooms.length, l: "Rooms" }, { n: totalItems, l: "Items" }, { n: pct + "%", l: "Done" }].map((s, i) => (
+            <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 10px", textAlign: "center" }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>{s.n}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1, marginTop: 3 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "white", margin: "0 16px", borderRadius: 18, padding: "22px 20px", marginTop: -24, boxShadow: "0 8px 32px rgba(0,0,0,0.10)", position: "relative", zIndex: 2 }}>
+        <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#9BA3AF", fontWeight: 700, marginBottom: 16 }}>Property Details</div>
+        <div style={{ marginBottom: 13 }}>
+          <label style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, display: "block", marginBottom: 6 }}>PROPERTY ADDRESS</label>
+          <input value={property.address} onChange={e => setProperty(p => ({ ...p, address: e.target.value }))} placeholder="123 Main St" style={inputStyle} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 13 }}>
+          {[["TENANT 1 NAME", "tenant", "Jane Smith"], ["TENANT 2 NAME", "tenant2", "John Smith"]].map(([lbl, field, ph]) => (
+            <div key={field}>
+              <label style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, display: "block", marginBottom: 6 }}>{lbl}</label>
+              <input value={property[field]} onChange={e => setProperty(p => ({ ...p, [field]: e.target.value }))} placeholder={ph} style={inputStyle} />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: 13 }}>
+          <label style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, display: "block", marginBottom: 6 }}>LANDLORD / AGENT</label>
+          <input value={property.landlord} onChange={e => setProperty(p => ({ ...p, landlord: e.target.value }))} placeholder="Your Name" style={inputStyle} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          {[["INSPECTION DATE", "date"], ["MOVE-IN DATE", "moveIn"]].map(([lbl, field]) => (
+            <div key={field}>
+              <label style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, display: "block", marginBottom: 6 }}>{lbl}</label>
+              <input type="date" value={property[field]} onChange={e => setProperty(p => ({ ...p, [field]: e.target.value }))} style={inputStyle} />
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setScreen("inspect")} style={{ width: "100%", background: "linear-gradient(135deg, #0D1B2A, #1B3A52)", color: "white", border: "none", borderRadius: 12, padding: "15px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          Begin Inspection →
+        </button>
+        {doneItems > 0 && (
+          <button onClick={() => setScreen("report")} style={{ width: "100%", background: "#F0F9F4", color: "#2E9957", border: "1.5px solid #A8D5B8", borderRadius: 12, padding: "13px", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 10 }}>
+            View Report →
+          </button>
+        )}
+      </div>
+
+      <div style={{ padding: "20px 16px 8px" }}>
+        <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#9BA3AF", fontWeight: 700, marginBottom: 12 }}>Rooms</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {rooms.map((r, ri) => {
+            const done = getRoomDone(ri);
+            const rPct = Math.round((done / r.items.length) * 100);
+            return (
+              <button key={ri} onClick={() => { switchRoom(ri); setScreen("inspect"); }}
+                style={{ background: "white", border: "1.5px solid #F0F0F0", borderRadius: 12, padding: "14px 12px", textAlign: "left", cursor: "pointer" }}>
+                <div style={{ fontSize: 20, marginBottom: 6 }}>{r.emoji}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{r.name}</div>
+                <div style={{ fontSize: 11, color: "#9BA3AF" }}>{done}/{r.items.length} items</div>
+                <div style={{ height: 3, background: "#F0F0F0", borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: rPct + "%", background: rPct === 100 ? "#2E9957" : "#1B3A52", borderRadius: 2 }} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ height: 36 }} />
+    </div>
+  );
+
+  // REPORT
+  if (screen === "report") return (
+    <div style={{ background: "#F7F8FA", minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ background: "linear-gradient(160deg, #0D1B2A, #1B3A52)", color: "white", padding: "44px 20px 32px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <button onClick={() => setScreen("inspect")} style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.12)", border: "none", color: "white", fontSize: 18, cursor: "pointer" }}>←</button>
+          <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#7EC8E3", fontWeight: 700 }}>Inspection Report</div>
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>{property.address || "Property Inspection"}</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Generated {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+      </div>
+      <div style={{ background: "white", padding: "20px", marginBottom: 2 }}>
+        <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#9BA3AF", fontWeight: 700, marginBottom: 14 }}>Details</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {[["Tenant 1", property.tenant || "—"], ["Tenant 2", property.tenant2 || "—"], ["Landlord", property.landlord || "—"], ["Inspection Date", property.date || "—"], ["Move-In Date", property.moveIn || "—"]].map(([l, v]) => (
+            <div key={l}>
+              <div style={{ fontSize: 10, color: "#9BA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>{l}</div>
+              <div style={{ fontSize: 14, color: "#111827", fontWeight: 600 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, padding: "10px 12px 2px" }}>
+        {[
+          { n: Object.values(conditions).filter(c => c === "Good").length, l: "Good", bg: "#E8F5EE", col: "#2E9957" },
+          { n: Object.values(conditions).filter(c => c === "Fair").length, l: "Fair", bg: "#FFF8EC", col: "#E0960A" },
+          { n: issueCount, l: "Issues", bg: "#FEF0F0", col: "#D93030" },
+          { n: pct + "%", l: "Done", bg: "#EEF2FF", col: "#1A3A4A" },
+        ].map((s, i) => (
+          <div key={i} style={{ flex: 1, background: s.bg, borderRadius: 12, padding: "12px 6px", textAlign: "center" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.col }}>{s.n}</div>
+            <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      {rooms.map((room, ri) => {
+        const filled = room.items.map((item, ii) => ({ item, cond: conditions[k(ri, ii)], note: notes[k(ri, ii)] })).filter(x => x.cond);
+        if (!filled.length) return null;
+        const roomIssues = filled.filter(x => x.cond === "Poor").length;
+        return (
+          <div key={ri} style={{ background: "white", marginBottom: 2, marginTop: 2 }}>
+            <div style={{ padding: "12px 18px", background: "#F7F8FA", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>{room.emoji}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#374151", flex: 1 }}>{room.name}</span>
+              {roomIssues > 0 && <span style={{ fontSize: 11, background: "#FEF0F0", color: "#D93030", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>{roomIssues} issue{roomIssues !== 1 ? "s" : ""}</span>}
+              <span style={{ fontSize: 11, color: "#9BA3AF" }}>{filled.length}/{room.items.length}</span>
+            </div>
+            {filled.map((x, i) => (
+              <div key={i} style={{ padding: "11px 18px", borderBottom: "1px solid #F7F8FA", display: "flex", alignItems: "flex-start", gap: 10, background: x.cond === "Poor" ? "#FEF8F8" : "white" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COND[x.cond].dot, flexShrink: 0, marginTop: 5 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{x.item}</div>
+                  {x.note && <div style={{ fontSize: 11, color: "#9BA3AF", marginTop: 2 }}>{x.note}</div>}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: COND[x.cond].text, background: COND[x.cond].bg, padding: "3px 9px", borderRadius: 6, flexShrink: 0, border: "1px solid " + COND[x.cond].border }}>{x.cond}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      <div style={{ padding: "16px 16px 48px" }}>
+        <button onClick={() => setScreen("inspect")} style={{ width: "100%", background: "#0D1B2A", color: "white", border: "none", borderRadius: 12, padding: "14px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          ← Back to Checklist
+        </button>
+      </div>
+    </div>
+  );
+
+  // INSPECT
+  const room = rooms[activeRoom];
+  const roomDone = getRoomDone(activeRoom);
+  const roomPct = Math.round((roomDone / room.items.length) * 100);
+
+  return (
+    <div style={{ background: "#F7F8FA", minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
+
+      {/* Hidden file inputs - separate for photo and video */}
+      <input ref={photoRef} type="file" accept="image/*" capture="environment" multiple style={{ display: "none" }} onChange={handlePhoto} />
+      <input ref={videoRef} type="file" accept="video/*" capture="environment" style={{ display: "none" }} onChange={handleVideo} />
+
+      <div style={{ background: "white", borderBottom: "1px solid #F0F0F0", padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 20, boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}>
+        <button onClick={() => setScreen("home")} style={{ width: 36, height: 36, borderRadius: 10, background: "#F3F4F6", border: "none", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>←</button>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{property.address || "Inspection"}</div>
+          <div style={{ fontSize: 11, color: "#9BA3AF" }}>{[property.tenant, property.tenant2].filter(Boolean).join(" & ") || "Tenants"} · {property.date}</div>
+        </div>
+        <button onClick={() => setScreen("report")} style={{ background: "#0D1B2A", color: "white", border: "none", borderRadius: 9, padding: "7px 13px", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+          Report {issueCount > 0 ? "· " + issueCount + " ⚠" : ""}
+        </button>
+      </div>
+
+      <div style={{ background: "white", padding: "10px 16px 12px", borderBottom: "1px solid #F0F0F0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
+          <span style={{ fontSize: 11, color: "#6B7280", fontWeight: 600 }}>{doneItems} of {totalItems} items inspected</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: "#0D1B2A" }}>{pct}%</span>
+        </div>
+        <div style={{ height: 5, background: "#F0F0F0", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: pct + "%", background: pct === 100 ? "#2E9957" : "linear-gradient(90deg, #0D1B2A, #2B7AA5)", borderRadius: 3, transition: "width 0.4s ease" }} />
+        </div>
+      </div>
+
+      <div ref={tabsRef} style={{ overflowX: "auto", display: "flex", gap: 6, padding: "10px 12px", background: "white", borderBottom: "1px solid #F0F0F0" }}>
+        {rooms.map((r, ri) => {
+          const d = getRoomDone(ri);
+          const active = activeRoom === ri;
+          const complete = d === r.items.length && d > 0;
+          return (
+            <button key={ri} onClick={() => switchRoom(ri)}
+              style={{ flexShrink: 0, padding: "6px 13px", borderRadius: 20, border: complete && !active ? "1.5px solid #A8D5B8" : "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: active ? "#0D1B2A" : complete ? "#E8F5EE" : "#F3F4F6", color: active ? "white" : complete ? "#1B6B3A" : "#6B7280", whiteSpace: "nowrap" }}>
+              {r.emoji} {r.name} {d > 0 && !active ? "(" + d + "/" + r.items.length + ")" : ""}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: "14px 14px 6px", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 24 }}>{room.emoji}</span>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: "#111827" }}>{room.name}</div>
+          <div style={{ fontSize: 11, color: "#9BA3AF" }}>{roomDone} of {room.items.length} items · {roomPct}% complete</div>
+        </div>
+      </div>
+      <div style={{ padding: "0 14px 10px" }}>
+        <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: roomPct + "%", background: roomPct === 100 ? "#2E9957" : "#1B3A52", borderRadius: 2, transition: "width 0.3s" }} />
+        </div>
+      </div>
+
+      <div style={{ paddingBottom: 100 }}>
+        {room.items.map((item, ii) => {
+          const cond = conditions[k(activeRoom, ii)];
+          const itemMedia = media[k(activeRoom, ii)] || [];
+          const cfg = cond ? COND[cond] : null;
+          return (
+            <div key={ii} className="item-card" style={{ background: cfg ? cfg.bg : "white", margin: "0 12px 8px", borderRadius: 14, border: "1.5px solid " + (cfg ? cfg.border : "#F0F0F0"), overflow: "hidden", transition: "all 0.2s" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 14px 9px" }}>
+                <div style={{ width: 9, height: 9, borderRadius: "50%", background: cfg ? cfg.dot : "#D1D5DB", flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: cfg ? cfg.text : "#111827", lineHeight: 1.3 }}>{item}</div>
+                {itemMedia.length > 0 && <span style={{ fontSize: 10, background: "rgba(0,0,0,0.07)", color: "#6B7280", padding: "2px 8px", borderRadius: 10, fontWeight: 700, flexShrink: 0 }}>{itemMedia.length} 📎</span>}
+              </div>
+              <div style={{ display: "flex", gap: 6, padding: "0 14px 10px" }}>
+                {["Good", "Fair", "Poor"].map(c => (
+                  <button key={c} onClick={() => setCondition(activeRoom, ii, c)}
+                    style={{ flex: 1, padding: "8px 4px", borderRadius: 9, border: "1.5px solid " + (cond === c ? COND[c].border : "#E5E7EB"), background: cond === c ? COND[c].bg : "white", color: cond === c ? COND[c].text : "#6B7280", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    {COND[c].label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                placeholder="Add notes…"
+                rows={1}
+                value={notes[k(activeRoom, ii)] || ""}
+                onChange={e => setNotes(prev => ({ ...prev, [k(activeRoom, ii)]: e.target.value }))}
+                onInput={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
+                style={{ width: "100%", border: "none", borderTop: "1px solid #F0F0F0", padding: "9px 14px", fontSize: 13, color: "#374151", background: "transparent", outline: "none", fontFamily: "inherit" }}
+              />
+              <div style={{ display: "flex", gap: 7, padding: "8px 14px 12px", borderTop: "1px solid #F0F0F0", overflowX: "auto" }}>
+                <button onClick={() => triggerPhoto(activeRoom, ii)} style={{ flexShrink: 0, padding: "7px 12px", borderRadius: 8, border: "1.5px solid #CBD5E1", background: "#F8FAFC", color: "#334155", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>📷 Photo</button>
+                <button onClick={() => triggerVideo(activeRoom, ii)} style={{ flexShrink: 0, padding: "7px 12px", borderRadius: 8, border: "1.5px solid #CBD5E1", background: "#F8FAFC", color: "#334155", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🎥 Video</button>
+                {itemMedia.map((m, mi) => (
+                  <div key={mi} style={{ position: "relative", flexShrink: 0 }}>
+                    {m.type === "photo"
+                      ? <img src={m.src} onClick={() => setLightbox({ key: k(activeRoom, ii), mi })} style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", border: "2px solid #E5E7EB", cursor: "pointer", display: "block" }} />
+                      : <div onClick={() => setLightbox({ key: k(activeRoom, ii), mi })} style={{ width: 52, height: 52, borderRadius: 8, background: "#1A3A4A", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #2B7AA5", color: "white", fontSize: 18 }}>▶</div>
+                    }
+                    <button onClick={() => deleteMediaItem(activeRoom, ii, mi)} style={{ position: "absolute", top: -5, right: -5, width: 18, height: 18, borderRadius: "50%", background: "#D93030", color: "white", border: "none", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "white", borderTop: "1px solid #F0F0F0", padding: "12px 14px 28px", display: "flex", gap: 8, zIndex: 20 }}>
+        <button onClick={() => switchRoom(Math.max(0, activeRoom - 1))} disabled={activeRoom === 0}
+          style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1.5px solid #E5E7EB", background: activeRoom === 0 ? "#F9FAFB" : "white", color: activeRoom === 0 ? "#CBD5E1" : "#374151", fontSize: 13, fontWeight: 700, cursor: activeRoom === 0 ? "default" : "pointer" }}>
+          ← Prev
+        </button>
+        <button onClick={() => setScreen("report")}
+          style={{ padding: "12px 16px", borderRadius: 12, background: "#0D1B2A", color: "white", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          📋{issueCount > 0 ? " " + issueCount + " ⚠" : ""}
+        </button>
+        <button onClick={() => switchRoom(Math.min(rooms.length - 1, activeRoom + 1))} disabled={activeRoom === rooms.length - 1}
+          style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1.5px solid #E5E7EB", background: activeRoom === rooms.length - 1 ? "#F9FAFB" : "white", color: activeRoom === rooms.length - 1 ? "#CBD5E1" : "#374151", fontSize: 13, fontWeight: 700, cursor: activeRoom === rooms.length - 1 ? "default" : "pointer" }}>
+          Next →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
